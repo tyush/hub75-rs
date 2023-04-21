@@ -353,12 +353,15 @@ impl<PINS: Outputs> Hub75<PINS> {
 }
 
 use embedded_graphics::{
-    drawable::{Dimensions, Pixel},
     pixelcolor::Rgb565,
-    Drawing, SizedDrawing,
+    prelude::{Dimensions, DrawTarget, Pixel, Point, RgbColor, Size},
+    primitives::Rectangle,
 };
-impl<PINS: Outputs> Drawing<Rgb565> for Hub75<PINS> {
-    fn draw<T>(&mut self, item_pixels: T)
+impl<PINS: Outputs> DrawTarget for Hub75<PINS> {
+    type Color = Rgb565;
+    type Error = ();
+
+    fn draw_iter<T>(&mut self, item_pixels: T) -> Result<(), ()>
     where
         T: IntoIterator<Item = Pixel<Rgb565>>,
     {
@@ -382,9 +385,9 @@ impl<PINS: Outputs> Drawing<Rgb565> for Hub75<PINS> {
             223, 225, 228, 231, 233, 236, 239, 241, 244, 247, 249, 252, 255,
         ];
         for Pixel(coord, color) in item_pixels {
-            let row = coord[1] % NUM_ROWS as u32;
+            let row = coord[1] % NUM_ROWS as i32;
             let data = &mut self.data[row as usize][coord[0] as usize];
-            if coord[1] >= NUM_ROWS as u32 {
+            if coord[1] >= NUM_ROWS as i32 {
                 data.3 = GAMMA8[color.r() as usize];
                 data.4 = GAMMA8[color.g() as usize];
                 data.5 = GAMMA8[color.b() as usize];
@@ -394,15 +397,19 @@ impl<PINS: Outputs> Drawing<Rgb565> for Hub75<PINS> {
                 data.2 = GAMMA8[color.b() as usize];
             }
         }
+        Ok(())
     }
 }
 
-// TODO Does it make sense to include this?
-impl<PINS: Outputs> SizedDrawing<Rgb565> for Hub75<PINS> {
-    fn draw_sized<T>(&mut self, item_pixels: T)
-    where
-        T: IntoIterator<Item = Pixel<Rgb565>> + Dimensions,
-    {
-        self.draw(item_pixels);
+impl<PINS: Outputs> Dimensions for Hub75<PINS> {
+    fn bounding_box(&self) -> embedded_graphics::primitives::Rectangle {
+        Rectangle {
+            top_left: Point::zero(),
+            size: if cfg!(feature = "size-64x64") {
+                Size::new(64, 64)
+            } else {
+                Size::new(32, 32)
+            },
+        }
     }
 }
